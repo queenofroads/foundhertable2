@@ -25,70 +25,166 @@
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 
-  /* ---- ANIMATED CANVAS: BURGUNDY SATIN SHIMMER ---- */
-  let animFrame = 0;
-  let scrollProg = 0;
-
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
   function lerp(a, b, t)    { return a + (b - a) * clamp(t, 0, 1); }
 
-  function drawCanvas() {
-    ctx.clearRect(0, 0, canvasW, canvasH);
+  /* ---- IMAGE SLIDESHOW (scroll-driven, simulates fluid video) ---- */
+  /* Place event photos in img/ folder with these exact names.
+     Each image covers an equal portion of the scroll journey.
+     Transitions use GSAP crossfade for a cinematic feel. */
+  const IMAGE_PATHS = [
+    'img/event-01.jpg',   /* table setting / room wide shot */
+    'img/event-02.jpg',   /* women dining, intimate */
+    'img/event-03.jpg',   /* speaker / presentation moment */
+    'img/event-04.jpg',   /* close-up conversation */
+    'img/event-05.jpg',   /* group discussion / panel */
+    'img/event-06.jpg',   /* table detail: roses, glasses, cutlery */
+    'img/event-07.jpg',   /* women laughing / energy shot */
+    'img/event-08.jpg',   /* wide room shot / atmosphere */
+  ];
 
+  const loadedImages  = [];
+  let   currentImg    = null;
+  let   nextImg       = null;
+  let   crossfadeAlpha = 1;
+  let   targetImgIdx   = 0;
+  let   currentImgIdx  = 0;
+  let   imagesReady    = false;
+
+  function preloadImages() {
+    let loaded = 0;
+    IMAGE_PATHS.forEach((src, i) => {
+      const img = new Image();
+      img.onload = () => {
+        loadedImages[i] = img;
+        loaded++;
+        if (loaded === IMAGE_PATHS.length) {
+          imagesReady = true;
+          currentImg  = loadedImages[0];
+        }
+      };
+      img.onerror = () => {
+        loadedImages[i] = null; // missing image — gradient fallback used
+        loaded++;
+        if (loaded === IMAGE_PATHS.length) {
+          imagesReady = true;
+          const firstLoaded = loadedImages.find(Boolean);
+          currentImg = firstLoaded || null;
+        }
+      };
+      img.src = src;
+    });
+  }
+
+  preloadImages();
+
+  /* Draw image to canvas in padded-cover mode */
+  const IMAGE_SCALE = 0.88;
+  function drawImage(img, alpha) {
+    if (!img) return;
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const scale = Math.max(canvasW / iw, canvasH / ih) * IMAGE_SCALE;
+    const dw = iw * scale, dh = ih * scale;
+    const dx = (canvasW - dw) / 2, dy = (canvasH - dh) / 2;
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(img, dx, dy, dw, dh);
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---- ANIMATED CANVAS: BURGUNDY SATIN SHIMMER (gradient fallback / overlay) ---- */
+  let animFrame = 0;
+  let scrollProg = 0;
+
+  function drawGradient(alpha) {
     const t = scrollProg;
     const f = animFrame;
 
-    /* Base radial gradient shifts with scroll and time */
+    ctx.globalAlpha = alpha;
+
     const cx = canvasW * (0.45 + Math.sin(f * 0.0004) * 0.08);
     const cy = canvasH * (0.42 + Math.cos(f * 0.0003) * 0.06);
-    const radius = Math.max(canvasW, canvasH) * 0.9;
-    const base = ctx.createRadialGradient(cx, cy, 0, canvasW / 2, canvasH / 2, radius);
+    const base = ctx.createRadialGradient(cx, cy, 0, canvasW / 2, canvasH / 2, Math.max(canvasW, canvasH) * 0.9);
 
-    /* Inner color: transitions from deep maroon → rich burgundy as you scroll */
     const r1 = Math.round(lerp(90,  130, t));
     const g1 = Math.round(lerp(8,   22,  t));
     const b1 = Math.round(lerp(30,  50,  t));
 
-    const r2 = Math.round(lerp(40,  70,  t));
-    const g2 = Math.round(lerp(2,   8,   t));
-    const b2 = Math.round(lerp(12,  25,  t));
-
     base.addColorStop(0,   `rgb(${r1},${g1},${b1})`);
-    base.addColorStop(0.5, `rgb(${r2},${g2},${b2})`);
+    base.addColorStop(0.5, `rgb(${Math.round(lerp(40,70,t))},${Math.round(lerp(2,8,t))},${Math.round(lerp(12,25,t))})`);
     base.addColorStop(1,   '#140008');
 
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, canvasW, canvasH);
 
-    /* Satin sheen — diagonal light sweep */
-    const sheenPct = 0.15 + Math.sin(f * 0.0005) * 0.35;
-    const sheenX0  = canvasW * sheenPct;
-    const sheenX1  = canvasW * (sheenPct + 0.25);
-    const sheen    = ctx.createLinearGradient(sheenX0, 0, sheenX1, canvasH);
-
-    sheen.addColorStop(0,    'rgba(255,230,200,0)');
-    sheen.addColorStop(0.42, 'rgba(255,230,200,0)');
-    sheen.addColorStop(0.50, 'rgba(255,220,180,0.055)');
-    sheen.addColorStop(0.58, 'rgba(255,230,200,0)');
-    sheen.addColorStop(1,    'rgba(255,230,200,0)');
-
-    ctx.fillStyle = sheen;
+    /* Satin sheen */
+    const sx  = canvasW * (0.15 + Math.sin(f * 0.0005) * 0.35);
+    const sh  = ctx.createLinearGradient(sx, 0, sx + canvasW * 0.25, canvasH);
+    sh.addColorStop(0,    'rgba(255,230,200,0)');
+    sh.addColorStop(0.50, 'rgba(255,220,180,0.055)');
+    sh.addColorStop(1,    'rgba(255,230,200,0)');
+    ctx.fillStyle = sh;
     ctx.fillRect(0, 0, canvasW, canvasH);
 
-    /* Secondary warm accent glow (bottom-left) */
-    const glow = ctx.createRadialGradient(
-      canvasW * 0.15, canvasH * 0.85, 0,
-      canvasW * 0.15, canvasH * 0.85,
-      canvasW * 0.45
-    );
-    glow.addColorStop(0,   `rgba(160, 36, 58, ${0.18 + t * 0.12})`);
-    glow.addColorStop(0.6, 'rgba(90, 14, 30, 0.06)');
-    glow.addColorStop(1,   'rgba(90, 14, 30, 0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, canvasW, canvasH);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawCanvas() {
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    if (imagesReady && currentImg) {
+      /* Draw current image */
+      drawImage(currentImg, 1);
+
+      /* Crossfade dark burgundy tint over the photo for richness */
+      const tint = ctx.createLinearGradient(0, 0, 0, canvasH);
+      tint.addColorStop(0,   'rgba(14,0,6,0.45)');
+      tint.addColorStop(0.5, 'rgba(14,0,6,0.25)');
+      tint.addColorStop(1,   'rgba(14,0,6,0.55)');
+      ctx.fillStyle = tint;
+      ctx.fillRect(0, 0, canvasW, canvasH);
+
+      /* Cross-fade to next image when transitioning */
+      if (nextImg && crossfadeAlpha < 1) {
+        drawImage(nextImg, crossfadeAlpha);
+        ctx.fillStyle = `rgba(14,0,6,${0.45 - crossfadeAlpha * 0.2})`;
+        ctx.fillRect(0, 0, canvasW, canvasH);
+      }
+    } else {
+      /* Fallback: pure gradient when no images loaded */
+      drawGradient(1);
+    }
 
     animFrame++;
     requestAnimationFrame(drawCanvas);
+  }
+
+  /* Update which image shows based on scroll progress */
+  function updateImageFromScroll(progress) {
+    if (!imagesReady) return;
+    const raw   = progress * IMAGE_PATHS.length;
+    const idx   = clamp(Math.floor(raw), 0, IMAGE_PATHS.length - 1);
+    const alpha = raw - Math.floor(raw); // fractional position within this image's zone
+
+    if (idx !== currentImgIdx) {
+      /* Start crossfade to new image */
+      const newImg = loadedImages[idx];
+      if (newImg) {
+        nextImg       = newImg;
+        crossfadeAlpha = 0;
+        gsap.to({ a: 0 }, {
+          a:        1,
+          duration: 0.5,
+          ease:     'power2.inOut',
+          onUpdate: function() { crossfadeAlpha = this.targets()[0].a; },
+          onComplete: () => {
+            currentImg    = nextImg;
+            nextImg       = null;
+            crossfadeAlpha = 1;
+          },
+        });
+      }
+      currentImgIdx = idx;
+    }
   }
 
   drawCanvas();
@@ -160,6 +256,9 @@
         /* Canvas reveals via expanding circle */
         const wipe = clamp((self.progress - 0.01) / 0.07, 0, 1);
         canvasWrap.style.clipPath = `circle(${wipe * 82}% at 50% 50%)`;
+
+        /* Drive image slideshow */
+        updateImageFromScroll(self.progress);
       },
     });
 
