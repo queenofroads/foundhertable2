@@ -101,28 +101,59 @@
 
     ctx.globalAlpha = alpha;
 
-    const cx = canvasW * (0.45 + Math.sin(f * 0.0004) * 0.08);
-    const cy = canvasH * (0.42 + Math.cos(f * 0.0003) * 0.06);
-    const base = ctx.createRadialGradient(cx, cy, 0, canvasW / 2, canvasH / 2, Math.max(canvasW, canvasH) * 0.9);
-
-    const r1 = Math.round(lerp(90,  130, t));
-    const g1 = Math.round(lerp(8,   22,  t));
-    const b1 = Math.round(lerp(30,  50,  t));
-
-    base.addColorStop(0,   `rgb(${r1},${g1},${b1})`);
-    base.addColorStop(0.5, `rgb(${Math.round(lerp(40,70,t))},${Math.round(lerp(2,8,t))},${Math.round(lerp(12,25,t))})`);
-    base.addColorStop(1,   '#140008');
-
-    ctx.fillStyle = base;
+    /* Base: deep near-black burgundy */
+    ctx.fillStyle = '#0E0005';
     ctx.fillRect(0, 0, canvasW, canvasH);
 
-    /* Satin sheen */
-    const sx  = canvasW * (0.15 + Math.sin(f * 0.0005) * 0.35);
-    const sh  = ctx.createLinearGradient(sx, 0, sx + canvasW * 0.25, canvasH);
-    sh.addColorStop(0,    'rgba(255,230,200,0)');
-    sh.addColorStop(0.50, 'rgba(255,220,180,0.055)');
-    sh.addColorStop(1,    'rgba(255,230,200,0)');
+    /* Main candlelight glow — warm amber rising from table level */
+    const glowY  = canvasH * (0.72 + Math.sin(f * 0.0006) * 0.025);
+    const glowX  = canvasW * (0.50 + Math.sin(f * 0.0004) * 0.04);
+    const gSize  = Math.max(canvasW, canvasH) * (0.9 + Math.sin(f * 0.0003) * 0.06);
+    const candle = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, gSize);
+    candle.addColorStop(0,    'rgba(201,140,60,0.38)');
+    candle.addColorStop(0.12, 'rgba(160,36,58,0.52)');
+    candle.addColorStop(0.30, 'rgba(92,16,32,0.62)');
+    candle.addColorStop(0.60, 'rgba(30,0,13,0.82)');
+    candle.addColorStop(1,    'rgba(14,0,5,0.98)');
+    ctx.fillStyle = candle;
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    /* Secondary cool glow top-right — like ambient room light */
+    const ax  = canvasW * (0.78 + Math.sin(f * 0.00035) * 0.06);
+    const ay  = canvasH * (0.18 + Math.cos(f * 0.00028) * 0.04);
+    const amb = ctx.createRadialGradient(ax, ay, 0, ax, ay, canvasW * 0.55);
+    amb.addColorStop(0,   'rgba(139,26,42,0.28)');
+    amb.addColorStop(0.5, 'rgba(92,16,32,0.12)');
+    amb.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = amb;
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    /* Scroll-driven colour shift: warm → cool burgundy as user scrolls */
+    const scrollTint = ctx.createLinearGradient(0, 0, 0, canvasH);
+    const warmR = Math.round(lerp(80, 139, t)), warmG = Math.round(lerp(18, 0, t));
+    scrollTint.addColorStop(0,   `rgba(${warmR},${warmG},30, ${lerp(0, 0.18, t)})`);
+    scrollTint.addColorStop(0.6, 'rgba(0,0,0,0)');
+    ctx.fillStyle = scrollTint;
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    /* Horizontal satin sheen — sweeps slowly left/right */
+    const sx = canvasW * (0.05 + ((f * 0.0002) % 1));
+    const sh = ctx.createLinearGradient(sx, 0, sx + canvasW * 0.28, canvasH * 0.6);
+    sh.addColorStop(0,    'rgba(255,235,195,0)');
+    sh.addColorStop(0.45, 'rgba(255,228,188,0.042)');
+    sh.addColorStop(0.55, 'rgba(255,228,188,0.055)');
+    sh.addColorStop(1,    'rgba(255,235,195,0)');
     ctx.fillStyle = sh;
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    /* Vignette: darken all four edges */
+    const vig = ctx.createRadialGradient(
+      canvasW * 0.5, canvasH * 0.5, Math.min(canvasW, canvasH) * 0.28,
+      canvasW * 0.5, canvasH * 0.5, Math.max(canvasW, canvasH) * 0.82
+    );
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.72)');
+    ctx.fillStyle = vig;
     ctx.fillRect(0, 0, canvasW, canvasH);
 
     ctx.globalAlpha = 1;
